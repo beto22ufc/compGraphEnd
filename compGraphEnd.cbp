@@ -14,6 +14,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add directory="include" />
 				</Compiler>
 			</Target>
 			<Target title="Release">
@@ -24,6 +25,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add directory="include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
@@ -42,7 +44,13 @@
 			<Add library="gdi32" />
 			<Add directory="C:/Program Files (x86)/CodeBlocks2/MinGW/lib" />
 		</Linker>
+		<Unit filename="include/Plane.h" />
+		<Unit filename="include/Point3d.h" />
+		<Unit filename="include/Vector3d.h" />
 		<Unit filename="main.cpp" />
+		<Unit filename="src/Plane.cpp" />
+		<Unit filename="src/Point3d.cpp" />
+		<Unit filename="src/Vector3d.cpp" />
 		<Extensions>
 			<code_completion />
 			<envvars />

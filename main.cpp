@@ -1,177 +1,140 @@
-/*
- * GLUT Shapes Demo
- *
- * Written by Nigel Stewart November 2003
- *
- * This program is test harness for the sphere, cone
- * and torus shapes in GLUT.
- *
- * Spinning wireframe and smooth shaded shapes are
- * displayed until the ESC or q key is pressed.  The
- * number of geometry stacks and slices can be adjusted
- * using the + and - keys.
- */
+// This program is a trivial little flight simulator.  You control a ship
+// with the keyboard.  Use
+//
+//   J and L keys to roll,
+//   I and K keys to pitch,
+//   H and ; keys to yaw,
+//   8 key to increase speed and the M key to decrease speed.
+//   W key toggles wireframe mode
+//   R key generates a new landscape
+//
+// In this little program you fly around a single fractal landscape. It would
+// be best to extend the program so that one could plug in any arbitrary
+// scene.
 
-#ifdef __APPLE__
+#ifdef __APPLE_CC__
 #include <GLUT/glut.h>
 #else
 #include <GL/glut.h>
 #endif
+#include <Cockpit.h>
+#include <Landscape.h>
+#include <iostream>
 
-#include <stdlib.h>
+// A landscape to fly around, with some parameters that are manipuated by the
+// program.
+Landscape landscape(200, 143);
 
-static int slices = 16;
-static int stacks = 16;
+// Wireframe view or solid view?
+static bool wireframe = false;
 
-/* GLUT callback Handlers */
-
-static void resize(int width, int height)
-{
-    const float ar = (float) width / (float) height;
-
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(-ar, ar, -1.0, 1.0, 2.0, 100.0);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity() ;
+void newLandscape() {
+  static double rug = ((double)rand()) / RAND_MAX;
+  landscape.create(rug);
 }
 
-static void display(void)
-{
-    const double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-    const double a = t*90.0;
+// A ship and some functions to control it: Later, we need to add a ship
+// controller class so even the navigation controls are pluggable.
+static Ship theShip(Point(60, 40, 220));
+static Cockpit cockpit(theShip);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glColor3d(1,0,0);
-
-    glPushMatrix();
-        glTranslated(-2.4,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidSphere(1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(0,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidCone(1,1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(2.4,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidTorus(0.2,0.8,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(-2.4,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireSphere(1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(0,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireCone(1,1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(2.4,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireTorus(0.2,0.8,slices,stacks);
-    glPopMatrix();
-
-    glutSwapBuffers();
+void keyboard(unsigned char key, int, int) {
+  const double deltaSpeed = 0.01;
+  const double angle = 0.02;
+  switch(key) {
+    case '8': theShip.setSpeed(theShip.getSpeed() + deltaSpeed); break;
+    case 'm': theShip.setSpeed(theShip.getSpeed() - deltaSpeed); break;
+    case 'w': wireframe = !wireframe; break;
+    case 'r': newLandscape();
+    case 'j': theShip.roll(angle); break;
+    case 'l': theShip.roll(-angle); break;
+    case 'h': theShip.yaw(angle); break;
+    case ';': theShip.yaw(-angle); break;
+    case 'i': theShip.pitch(-angle); break;
+    case 'k': theShip.pitch(angle);  break;
+  }
 }
 
-
-static void key(unsigned char key, int x, int y)
-{
-    switch (key)
-    {
-        case 27 :
-        case 'q':
-            exit(0);
-            break;
-
-        case '+':
-            slices++;
-            stacks++;
-            break;
-
-        case '-':
-            if (slices>3 && stacks>3)
-            {
-                slices--;
-                stacks--;
-            }
-            break;
-    }
-
-    glutPostRedisplay();
+// Display and Animation: To draw we just clear the window and draw the scene.
+// Because our main window is double buffered we have to swap the buffers to
+// make the drawing visible.  Animation is achieved by successively moving
+// the ship and drawing.
+void display() {
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  wireframe ? landscape.drawWireFrame() : landscape.draw();
+  cockpit.draw();
+  glFlush();
+  glutSwapBuffers();
 }
 
-static void idle(void)
-{
-    glutPostRedisplay();
+// Move the ship one step, recompute the view, and ask to redisplay.
+void timer(int v) {
+  theShip.fly();
+  Point eye(theShip.getPosition());
+  Point at(theShip.getPosition() + theShip.getDirection());
+  Vector up(theShip.getVertical());
+  glLoadIdentity();
+  gluLookAt(eye.x, eye.y, eye.z, at.x, at.y, at.z, up.i, up.j, up.k);
+  glutPostRedisplay();
+  glutTimerFunc(1000/60, timer, v);
 }
 
-const GLfloat light_ambient[]  = { 0.0f, 0.0f, 0.0f, 1.0f };
-const GLfloat light_diffuse[]  = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat light_position[] = { 2.0f, 5.0f, 5.0f, 0.0f };
+// Reshape callback: Make the viewport take up the whole window, recompute the
+// camera settings to match the new window shape, and go back to modelview
+// matrix mode.
+void reshape(int w, int h) {
+  glViewport(0, 0, w, h);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluPerspective(60.0, (GLfloat)w/(GLfloat)h, 0.05, 300.0);
+  glMatrixMode(GL_MODELVIEW);
+}
 
-const GLfloat mat_ambient[]    = { 0.7f, 0.7f, 0.7f, 1.0f };
-const GLfloat mat_diffuse[]    = { 0.8f, 0.8f, 0.8f, 1.0f };
-const GLfloat mat_specular[]   = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat high_shininess[] = { 100.0f };
+// init(): Initialize GLUT and enter the GLUT event loop.
+void init() {
+  srand(9903);
+  glEnable(GL_DEPTH_TEST);
+  newLandscape();
+  cockpit.create();
+  GLfloat black[] = { 0.0, 0.0, 0.0, 1.0 };
+  GLfloat dark[] = { 0.2, 0.15, 0.2, 1.0 };
+  GLfloat white[] = { 1.0, 1.0, 1.0, 1.0 };
+  GLfloat direction[] = { 0.2, 1.0, 0.5, 0.0 };
 
-/* Program entry point */
+  glMaterialfv(GL_FRONT, GL_SPECULAR, white);
+  glMaterialf(GL_FRONT, GL_SHININESS, 30);
 
-int main(int argc, char *argv[])
-{
-    glutInit(&argc, argv);
-    glutInitWindowSize(640,480);
-    glutInitWindowPosition(10,10);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+  glLightfv(GL_LIGHT0, GL_AMBIENT, dark);
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, white);
+  glLightfv(GL_LIGHT0, GL_SPECULAR, white);
+  glLightfv(GL_LIGHT0, GL_POSITION, direction);
 
-    glutCreateWindow("GLUT Shapes");
+  glEnable(GL_LIGHTING);                // so the renderer considers light
+  glEnable(GL_LIGHT0);                  // turn LIGHT0 on
+}
 
-    glutReshapeFunc(resize);
-    glutDisplayFunc(display);
-    glutKeyboardFunc(key);
-    glutIdleFunc(idle);
+// Writes some trivial help text to the console.
+void writeHelpToConsole() {
+  std::cout << "j/l = roll left / right\n";
+  std::cout << "i/k - pitch down / up\n";
+  std::cout << "h/; - yaw left / right\n";
+  std::cout << "8/m - speed up / slow down\n";
+  std::cout << "w - toggle wireframe mode\n";
+  std::cout << "r - generate a new landscape\n";
+}
 
-    glClearColor(1,1,1,1);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    glEnable(GL_LIGHT0);
-    glEnable(GL_NORMALIZE);
-    glEnable(GL_COLOR_MATERIAL);
-    glEnable(GL_LIGHTING);
-
-    glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-
-    glMaterialfv(GL_FRONT, GL_AMBIENT,   mat_ambient);
-    glMaterialfv(GL_FRONT, GL_DIFFUSE,   mat_diffuse);
-    glMaterialfv(GL_FRONT, GL_SPECULAR,  mat_specular);
-    glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
-
-    glutMainLoop();
-
-    return EXIT_SUCCESS;
+// main(): Initialize GLUT and enter the GLUT event loop.
+int main(int argc, char** argv) {
+  writeHelpToConsole();
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+  glutInitWindowPosition(80, 80);
+  glutInitWindowSize(780, 500);
+  glutCreateWindow("Simple Flight");
+  glutReshapeFunc(reshape);
+  glutTimerFunc(100, timer, 0);
+  glutDisplayFunc(display);
+  glutKeyboardFunc(keyboard);
+  init();
+  glutMainLoop();
 }
